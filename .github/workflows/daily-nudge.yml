@@ -1,0 +1,21 @@
+name: Daily recovery nudge
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send morning nudge
+        run: |
+          DAY=$(date +%A)
+          DATE=$(date '+%-d %B')
+          curl -s \
+            -H "Title: Recovery — $DAY $DATE" \
+            -H "Priority: default" \
+            -H "Tags: muscle,pill,droplet" \
+            -d "Morning Steve. Log your exercises, protein and how you're feeling today." \
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }}
