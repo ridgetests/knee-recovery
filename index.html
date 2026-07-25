@@ -194,6 +194,37 @@ const chkAlc=st=>st.alcoholFree===true;
 const chkEx=(st,dn)=>{const ph=gp(dn);const exs=(EX[ph.ek]||[]).concat(CFG.physioEx||[]);if(!exs.length)return false;const done=exs.filter(e=>st.exercises&&st.exercises[e.id]).length;return done/exs.length>=0.8;};
 const chkProt=st=>(st.protein||0)>=PG;
 const chkMove=st=>st.movedToday===true;
+function getDayRaw(off){try{var r=localStorage.getItem('rx4_'+dOff(off));return r?JSON.parse(r):null;}catch(e){return null;}}
+function setDayRaw(off,obj){try{localStorage.setItem('rx4_'+dOff(off),JSON.stringify(obj));}catch(e){}}
+function bfState(st,dn,k){
+  if(!st)return false;
+  if(k==='alc')return st.alcoholFree===true;
+  if(k==='move')return st.movedToday===true;
+  if(k==='prot')return (st.protein||0)>=PG;
+  if(k==='ex')return chkEx(st,dn);
+  return false;
+}
+function toggleBackfill(off,k){
+  var dn=gd()-off;
+  var st=(off===0)?S:(getDayRaw(off)||JSON.parse(JSON.stringify(DS)));
+  var on=bfState(st,dn,k);
+  if(k==='alc')st.alcoholFree=!on;
+  else if(k==='move')st.movedToday=!on;
+  else if(k==='prot')st.protein=on?0:PG;
+  else if(k==='ex'){
+    var exs=(EX[gp(dn).ek]||[]).concat(CFG.customEx||[]);
+    st.exercises=st.exercises||{};
+    exs.forEach(function(e){if(on){delete st.exercises[e.id];}else{st.exercises[e.id]=true;}});
+  }
+  if(off===0){save();}else{setDayRaw(off,st);}
+  renderStreaks();
+}
+function drySince(){
+  var n=streak(chkAlc);
+  if(n<1)return null;
+  var d=new Date();d.setDate(d.getDate()-(n-1));
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'long'});
+}
 function scoreHistory(n){const arr=[];for(let i=n-1;i>=1;i--){arr.push(scoreFor(getDay(i),gd()-i));}arr.push(todayScore());return arr;}
 
 // F1 drift detection — returns array of gentle flags
@@ -622,12 +653,31 @@ function renderStreaks(){
 
 <div style="padding:0 12px">
   <div style="display:flex;gap:8px;margin-bottom:8px">
-    ${sCard('Alcohol-free',alcS,'var(--blue)','🚫',alcS>0?'days running':'start today')}
+    ${sCard('Alcohol-free',alcS,'var(--blue)','🚫',alcS>0?('dry since '+drySince()):'start today')}
     ${sCard('Exercises',exS,'var(--green)','💪',exS>0?'days running':'start today')}
   </div>
   <div style="display:flex;gap:8px;margin-bottom:8px">
     ${sCard('Protein hit',protS,'var(--amber)','🥩',protS>0?'days running':'start today')}
     ${sCard('Moved',moveS,'var(--purple)','🚶',moveS>0?'days running':'start today')}
+  </div>
+</div>
+
+<div class="card">
+  <div class="lbl" style="margin-bottom:6px">Fill in the gaps</div>
+  <div style="font-size:11px;color:var(--t3);margin-bottom:14px;line-height:1.5">Days you did it but didn't log it. Today is on the right.</div>
+  ${[{k:'alc',i:'🚫',c:'var(--blue)'},{k:'ex',i:'💪',c:'var(--green)'},{k:'prot',i:'🥩',c:'var(--amber)'},{k:'move',i:'🚶',c:'var(--purple)'}].map(row=>`
+  <div style="display:flex;align-items:center;gap:5px;margin-bottom:7px">
+    <span style="font-size:12px;width:20px;flex-shrink:0">${row.i}</span>
+    ${Array.from({length:14},(_,n)=>{
+      const off=13-n;
+      const st=off===0?S:getDayRaw(off);
+      const on=bfState(st,gd()-off,row.k);
+      return `<div class="tap" onclick="toggleBackfill(${off},'${row.k}')" style="flex:1;aspect-ratio:1;max-width:19px;border-radius:50%;border:1px solid ${on?'transparent':'var(--s3)'};background:${on?row.c:'transparent'};${off===0?'box-shadow:0 0 0 1.5px var(--s2),0 0 0 2.5px '+row.c+'40;':''}"></div>`;
+    }).join('')}
+  </div>`).join('')}
+  <div style="display:flex;justify-content:space-between;margin-top:10px">
+    <span class="lbl-dim">14 days ago</span>
+    <span class="lbl-dim">Today</span>
   </div>
 </div>
 
