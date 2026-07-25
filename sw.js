@@ -1,4 +1,4 @@
-const CACHE = 'recovery-v2';
+const CACHE = 'recovery-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './sw.js'];
 
 self.addEventListener('install', e => {

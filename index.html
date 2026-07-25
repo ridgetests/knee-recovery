@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 <title>Recovery</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -49,6 +50,13 @@ textarea::placeholder{color:var(--t3)}
 .ringwrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
 .diaryin{background:var(--s2);border:1px solid var(--s3);border-radius:10px;padding:10px 12px;margin-bottom:7px}
 .diaryin textarea{min-height:22px;font-size:14px}
+#scanOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:200;padding:calc(20px + env(safe-area-inset-top)) 12px 20px;overflow-y:auto}
+.scanSheet{background:var(--s1);border:1px solid var(--s3);border-radius:16px;padding:16px;max-width:460px;margin:0 auto}
+.scanHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#scanCam{width:100%;border-radius:12px;overflow:hidden;background:#000;min-height:200px}
+#scanCam video{width:100%!important;border-radius:12px}
+.scanOpt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:1px solid var(--s3);border-radius:12px;margin-bottom:7px}
+.favchip{display:flex;align-items:center;gap:6px;padding:9px 11px;border:1px solid var(--s3);border-radius:11px;background:none;font-family:inherit;cursor:pointer;text-align:left;line-height:1.35}
 </style>
 </head>
 <body>
@@ -58,7 +66,6 @@ textarea::placeholder{color:var(--t3)}
     <button class="nt" onclick="sw('today')"><svg id="ni-today" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9.5z"/></svg><span class="nt-lbl" id="nl-today">Today</span></button>
     <button class="nt" onclick="sw('log')"><svg id="ni-log" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span class="nt-lbl" id="nl-log">Log</span></button>
     <button class="nt" onclick="sw('streaks')"><svg id="ni-streaks" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3s5 4 5 9a5 5 0 01-10 0c0-2 1-3 1-3s0 2 2 2 1-4 2-5z"/></svg><span class="nt-lbl" id="nl-streaks">Momentum</span></button>
-    <button class="nt" onclick="sw('build')"><svg id="ni-build" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg><span class="nt-lbl" id="nl-build">Build</span></button>
     <button class="nt" onclick="sw('plan')"><svg id="ni-plan" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span class="nt-lbl" id="nl-plan">Plan</span></button>
   </nav>
 </div>
@@ -132,7 +139,7 @@ const SURGERY_PARTS=[
 ];
 
 const DS={exercises:{},customEx:[],symptoms:{pain:3,swelling:2,rom:3,mood:3,sleep:3,energy:3},moodLogged:false,protein:0,supplements:{vitc:false,omega3:false,multi:false},brace:true,notes:'',alcoholFree:null,movedToday:null,scrollOk:null,diary:{good1:'',good2:'',good3:'',smile:'',free:''},builtToday:''};
-const CFG_DEF={weightStart:null,weightTarget:80,fundGoal:'Swiss holiday',commutePerWeek:1,weights:{},onMounjaro:false,physioStatus:'planning',physioLog:[],physioNotes:'',projects:[]};
+const CFG_DEF={weightStart:null,weightTarget:80,fundGoal:'Swiss holiday',commutePerWeek:1,weights:{},onMounjaro:false,physioStatus:'planning',physioLog:[],physioNotes:'',favFoods:[]};
 
 let S={...DS},CFG={...CFG_DEF},TAB='today';
 </script>
@@ -222,18 +229,151 @@ function addPManual(){var el=document.getElementById('pManual');if(!el)return;va
 function uNote(v){S.notes=v;save();}
 function uSym(k,v){S.symptoms[k]=parseInt(v);if(k==='mood')S.moodLogged=true;save();const sym=SYM.find(s=>s.k===k);if(sym){const el=document.getElementById('sv-'+k);const tag=sym.lb[parseInt(v)]||v;if(el)el.textContent=v+(sym.min===0?'/10':'/5')+' · '+tag;}}
 function uDiary(k,v){S.diary[k]=v;save();}
-function uBuilt(v){S.builtToday=v;save();}
 function setCom(n){CFG.commutePerWeek=n;saveCfg();renderToday();}
 function saveWeight(){const v=parseFloat(document.getElementById('wIn').value);if(v>0){CFG.weights[todayKey()]=v;if(!CFG.weightStart)CFG.weightStart=v;saveCfg();renderStreaks();}}
 function toggleMounjaro(){CFG.onMounjaro=!CFG.onMounjaro;saveCfg();renderStreaks();}
-function setPhysio(st){CFG.physioStatus=st;saveCfg();renderBuild();}
-function addPhysioSession(){const d=document.getElementById('psDate').value||todayKey();CFG.physioLog=CFG.physioLog||[];CFG.physioLog.unshift({date:d,note:document.getElementById('psNote').value||''});saveCfg();renderBuild();}
+function setPhysio(st){CFG.physioStatus=st;saveCfg();renderPlan();}
+function addPhysioSession(){const d=document.getElementById('psDate').value||todayKey();CFG.physioLog=CFG.physioLog||[];CFG.physioLog.unshift({date:d,note:document.getElementById('psNote').value||''});saveCfg();renderPlan();}
 function uPhysioNotes(v){CFG.physioNotes=v;saveCfg();}
-function addProject(){const v=document.getElementById('projIn').value.trim();if(v){CFG.projects=CFG.projects||[];CFG.projects.unshift({t:v,done:false,date:todayKey()});saveCfg();renderBuild();}}
-function toggleProject(i){CFG.projects[i].done=!CFG.projects[i].done;saveCfg();renderBuild();}
-function delProject(i){CFG.projects.splice(i,1);saveCfg();renderBuild();}
 function setupSubmit(){const s=parseFloat(document.getElementById('wStart').value);const t=parseFloat(document.getElementById('wTarget').value);if(s>0){CFG.weightStart=s;CFG.weights[todayKey()]=s;}if(t>0)CFG.weightTarget=t;saveCfg();renderStreaks();}
 </script>
+<script>
+/* ---------- Favourites ---------- */
+function favList(){return CFG.favFoods||[];}
+function addFav(label,grams){
+  if(!label||!(grams>0))return;
+  CFG.favFoods=CFG.favFoods||[];
+  if(CFG.favFoods.some(function(f){return f.l.toLowerCase()===label.toLowerCase()}))return;
+  CFG.favFoods.push({id:'f'+Date.now(),l:label,g:Math.round(grams)});
+  saveCfg();
+}
+function addFavFromInputs(){
+  var l=document.getElementById('favLabel'),g=document.getElementById('favGrams');
+  if(!l||!g)return;
+  var lab=l.value.trim(),gr=parseFloat(g.value);
+  if(!lab||!(gr>0))return;
+  addFav(lab,gr);l.value='';g.value='';renderLog();
+}
+function delFav(id){
+  CFG.favFoods=(CFG.favFoods||[]).filter(function(f){return f.id!==id});
+  saveCfg();renderLog();
+}
+function tapFav(id){
+  var f=(CFG.favFoods||[]).find(function(x){return x.id===id});
+  if(f)addP(f.g);
+}
+function toggleFavEdit(){window._favEdit=!window._favEdit;renderLog();}
+
+/* ---------- Barcode scanning ---------- */
+window._scan={code:'',name:'',per100:0,packG:0,servG:0,servP:0};
+
+function scanSupported(){
+  return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.Html5Qrcode);
+}
+function openScanner(){
+  if(!scanSupported()){
+    scanMsg('Scanner unavailable','Needs a camera and an internet connection. Use favourites or manual entry instead.');
+    return;
+  }
+  var ov=document.getElementById('scanOverlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='scanOverlay';
+    document.body.appendChild(ov);
+  }
+  ov.style.display='block';
+  ov.innerHTML='<div class="scanSheet"><div class="scanHead"><span style="font-size:13px;font-weight:500">Scan barcode</span><span class="tap" onclick="closeScanner()" style="color:var(--t2);font-size:20px;line-height:1">&times;</span></div><div id="scanCam"></div><div style="font-size:11px;color:var(--t3);padding:12px 2px 0;line-height:1.5">Hold the barcode steady in frame. Packaged food only &mdash; use favourites for anything without a barcode.</div></div>';
+  try{
+    window._qr=new Html5Qrcode('scanCam');
+    window._qr.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:140}},function(txt){
+      stopCam();lookupBarcode(txt);
+    },function(){}).catch(function(){
+      scanMsg('Camera blocked','Allow camera access in Settings, or use favourites and manual entry.');
+    });
+  }catch(e){scanMsg('Scanner failed to start','Use favourites or manual entry instead.');}
+}
+function stopCam(){
+  if(window._qr){try{window._qr.stop().then(function(){window._qr.clear();window._qr=null;}).catch(function(){window._qr=null;});}catch(e){window._qr=null;}}
+}
+function closeScanner(){
+  stopCam();
+  var ov=document.getElementById('scanOverlay');
+  if(ov)ov.style.display='none';
+}
+function scanMsg(title,body){
+  var ov=document.getElementById('scanOverlay');
+  if(!ov){ov=document.createElement('div');ov.id='scanOverlay';document.body.appendChild(ov);}
+  ov.style.display='block';
+  ov.innerHTML='<div class="scanSheet"><div class="scanHead"><span style="font-size:13px;font-weight:500">'+title+'</span><span class="tap" onclick="closeScanner()" style="color:var(--t2);font-size:20px;line-height:1">&times;</span></div><div style="font-size:13px;color:var(--t2);line-height:1.55;padding:6px 2px 4px">'+body+'</div></div>';
+}
+function parseGrams(str){
+  if(!str)return 0;
+  var s=(''+str).toLowerCase().replace(/,/g,'.');
+  var mx=s.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kg|g)/);
+  if(mx){var q=parseFloat(mx[2]);if(mx[3]==='kg')q*=1000;return parseFloat(mx[1])*q;}
+  var m=s.match(/(\d+(?:\.\d+)?)\s*(kg|g)\b/);
+  if(m){var v=parseFloat(m[1]);return m[2]==='kg'?v*1000:v;}
+  return 0;
+}
+function lookupBarcode(code){
+  scanMsg('Looking up…','Checking the food database.');
+  fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,brands,nutriments,quantity,serving_size')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(!d||d.status!==1||!d.product){
+        scanMsg('Not found','That barcode isn\'t in the database. Add it as a favourite manually instead.');
+        return;
+      }
+      var p=d.product,n=p.nutriments||{};
+      var per100=parseFloat(n.proteins_100g);
+      if(!(per100>=0)||isNaN(per100)){
+        scanMsg('No protein data','The database has this product but no protein figure. Add it manually.');
+        return;
+      }
+      window._scan={
+        code:code,
+        name:((p.brands?p.brands.split(',')[0].trim()+' ':'')+(p.product_name||'Product')).trim(),
+        per100:per100,
+        packG:parseGrams(p.quantity),
+        servG:parseGrams(p.serving_size),
+        servP:parseFloat(n.proteins_serving)||0
+      };
+      showScanResult();
+    })
+    .catch(function(){scanMsg('Lookup failed','No connection to the food database. Try again, or add it manually.');});
+}
+function showScanResult(){
+  var s=window._scan;
+  var packP=s.packG?Math.round(s.per100*s.packG/100):0;
+  var servP=s.servP?Math.round(s.servP):(s.servG?Math.round(s.per100*s.servG/100):0);
+  var rows='';
+  if(packP>0)rows+='<div class="tap scanOpt" onclick="applyScan('+packP+')"><div><div style="font-size:14px;font-weight:500">Whole pack</div><div style="font-size:11px;color:var(--t3);margin-top:2px">'+s.packG+'g</div></div><div style="font-size:19px;font-weight:600;color:var(--green)">'+packP+'g</div></div>';
+  if(servP>0)rows+='<div class="tap scanOpt" onclick="applyScan('+servP+')"><div><div style="font-size:14px;font-weight:500">One serving</div><div style="font-size:11px;color:var(--t3);margin-top:2px">'+(s.servG?s.servG+'g':'as labelled')+'</div></div><div style="font-size:19px;font-weight:600;color:var(--green)">'+servP+'g</div></div>';
+  rows+='<div class="tap scanOpt" onclick="applyScan('+Math.round(s.per100)+')"><div><div style="font-size:14px;font-weight:500">Per 100g</div><div style="font-size:11px;color:var(--t3);margin-top:2px">database value</div></div><div style="font-size:19px;font-weight:600;color:var(--green)">'+Math.round(s.per100)+'g</div></div>';
+  var ov=document.getElementById('scanOverlay');
+  ov.innerHTML='<div class="scanSheet"><div class="scanHead"><span style="font-size:13px;font-weight:500;flex:1;padding-right:10px">'+s.name+'</span><span class="tap" onclick="closeScanner()" style="color:var(--t2);font-size:20px;line-height:1">&times;</span></div>'
+    +'<div class="lbl" style="margin:4px 0 10px">How much did you have?</div>'+rows
+    +'<div style="display:flex;gap:8px;margin-top:10px"><input type="number" id="scanCustom" placeholder="Or grams eaten" step="1" style="flex:1;font-size:14px;font-weight:400"><button class="tap" onclick="applyScanCustom()" style="padding:0 18px;border-radius:10px;border:1px solid var(--s3);background:var(--s2);color:#fff;font-weight:500;font-family:inherit;cursor:pointer;font-size:13px">Add</button></div>'
+    +'</div>';
+}
+function applyScan(g){
+  if(g>0){
+    addP(g);
+    addFav(window._scan.name.slice(0,28),g);
+  }
+  closeScanner();renderLog();
+}
+function applyScanCustom(){
+  var el=document.getElementById('scanCustom');
+  if(!el)return;
+  var grams=parseFloat(el.value);
+  if(!(grams>0))return;
+  var prot=Math.round(window._scan.per100*grams/100);
+  if(prot>0){addP(prot);addFav(window._scan.name.slice(0,28),prot);}
+  closeScanner();renderLog();
+}
+</script>
+
 <script>
 function triBtn(active,label,color,key,icon){
   return `<div class="tap" onclick="tgl('${key}')" style="flex:1;padding:12px 8px;border-radius:12px;border:1px solid ${active?color:'var(--s3)'};background:${active?color:'transparent'};display:flex;flex-direction:column;align-items:center;gap:5px;transition:all .18s">
@@ -394,6 +534,32 @@ function renderLog(){
     </div>
   </div>
   <div class="pbar" style="margin-bottom:12px"><div id="pb" class="pbf" style="width:${pp}%;background:${S.protein>=PG?'var(--green)':'var(--blue)'}"></div></div>
+  <button class="tap" onclick="openScanner()" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--s3);background:var(--s2);color:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><path d="M7 8v8M10 8v8M13.5 8v8M17 8v8"/></svg>
+    Scan a barcode
+  </button>
+  ${favList().length?`
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+    <div class="lbl">Your foods</div>
+    <div class="tap" onclick="toggleFavEdit()" style="font-size:11px;font-weight:500;color:${window._favEdit?'var(--blue)':'var(--t2)'}">${window._favEdit?'Done':'Edit'}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+    ${favList().map(f=>`<button class="tap favchip" onclick="${window._favEdit?`delFav('${f.id}')`:`tapFav('${f.id}')`}" style="border-color:${window._favEdit?'var(--red)':'var(--s3)'}">
+      ${window._favEdit?'<span style="color:var(--red);font-size:15px;line-height:1">&minus;</span>':''}
+      <span style="flex:1;font-size:11px;color:var(--t2)">${f.l}<br><span style="color:var(--t3);font-weight:500">+${f.g}g</span></span>
+    </button>`).join('')}
+  </div>
+  ${window._favEdit?`<div style="display:flex;gap:6px;margin-bottom:14px">
+    <input type="text" id="favLabel" placeholder="Food name" style="flex:2;font-size:13px">
+    <input type="number" id="favGrams" placeholder="g" step="1" style="flex:1;font-size:14px;font-weight:400">
+    <button class="tap" onclick="addFavFromInputs()" style="padding:0 15px;border-radius:10px;border:none;background:#fff;color:#000;font-weight:600;font-family:inherit;cursor:pointer;font-size:13px">Save</button>
+  </div>`:''}`:`
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <input type="text" id="favLabel" placeholder="Save a food you eat often" style="flex:2;font-size:13px">
+    <input type="number" id="favGrams" placeholder="g" step="1" style="flex:1;font-size:14px;font-weight:400">
+    <button class="tap" onclick="addFavFromInputs()" style="padding:0 15px;border-radius:10px;border:none;background:#fff;color:#000;font-weight:600;font-family:inherit;cursor:pointer;font-size:13px">Save</button>
+  </div>`}
+  <div class="lbl" style="margin-bottom:9px">Common</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
     ${FOODS.map(f=>`<button class="tap" onclick="addP(${f.g})" style="padding:9px 11px;border-radius:11px;border:1px solid var(--s3);background:none;font-size:11px;color:var(--t2);cursor:pointer;text-align:left;line-height:1.4;font-family:inherit">${f.l}<br><span style="color:var(--t3);font-weight:500">+${f.g}g</span></button>`).join('')}
   </div>
@@ -528,50 +694,10 @@ ${!startW?`
 }
 </script>
 <script>
-function renderBuild(){
-  const projects=CFG.projects||[];
-  const activeP=projects.filter(p=>!p.done).length;
-  const doneP=projects.filter(p=>p.done).length;
+function physioBlock(){
   const ps=CFG.physioStatus||'planning';
   const plog=CFG.physioLog||[];
-
-  document.getElementById('view').innerHTML=
-`<div class="rise" style="padding:max(16px,env(safe-area-inset-top)) 0 0">
-<div style="padding:8px 16px 14px">
-  <div style="font-size:23px;font-weight:600;letter-spacing:-.6px">Build</div>
-  <div class="lbl" style="margin-top:5px">Use the year. Don't just heal it.</div>
-</div>
-
-<div class="card" style="background:linear-gradient(135deg,#0D0D14,#0A0A0A);border-color:#1A1A2E">
-  <div style="font-size:13px;color:#ccc;line-height:1.6">The knee is one track. You are the other. A day where the body did nothing but you made something still moved you forward. This is where that counts.</div>
-</div>
-
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div class="lbl">Projects & ideas</div>
-    <div style="font-size:12px;color:var(--t2)">${activeP} active${doneP?' · '+doneP+' shipped':''}</div>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:14px">
-    <input type="text" id="projIn" placeholder="A thing to build, learn or earn from…" style="flex:1" onkeydown="if(event.key==='Enter')addProject()">
-    <button class="tap" onclick="addProject()" style="padding:0 18px;border-radius:10px;border:none;background:#fff;color:#000;font-weight:600;font-family:inherit;cursor:pointer;font-size:14px">Add</button>
-  </div>
-  ${projects.length?projects.map((p,i)=>`
-  <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)">
-    <div class="tap chk" onclick="toggleProject(${i})" style="border-color:${p.done?'var(--green)':'var(--t3)'};background:${p.done?'var(--green)':'transparent'};margin-top:1px">${p.done?'<svg width="11" height="11" viewBox="0 0 11 11"><polyline points="2,5.5 4.3,8 9,3" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}</div>
-    <div style="flex:1">
-      <div style="font-size:14px;font-weight:400;color:${p.done?'var(--t3)':'#fff'};text-decoration:${p.done?'line-through':'none'};line-height:1.35">${p.t}</div>
-      <div class="lbl-dim" style="margin-top:3px;text-transform:none;letter-spacing:0">${p.done?'shipped':'added '+fsh(p.date)}</div>
-    </div>
-    <div class="tap" onclick="delProject(${i})" style="color:var(--t3);font-size:18px;padding:0 4px;line-height:1">×</div>
-  </div>`).join(''):'<div style="text-align:center;padding:20px 0;color:var(--t3);font-size:13px;line-height:1.6">Nothing yet.<br>A Claude project. A Lotus thread. A business idea.<br>Whatever keeps the maker in you alive.</div>'}
-</div>
-
-<div class="card">
-  <div class="lbl" style="margin-bottom:6px">What did you build today?</div>
-  <div style="font-size:11px;color:var(--t3);margin-bottom:10px;line-height:1.5">One line. Kept as a record of the year not wasted.</div>
-  <div class="diaryin"><textarea placeholder="Even something small…" oninput="uBuilt(this.value)">${S.builtToday||''}</textarea></div>
-</div>
-
+  return `
 <div style="padding:12px 16px 6px"><div class="lbl">Physiotherapy</div></div>
 ${ps!=='booked'?`
 <div class="card" style="border-color:#1A1420">
@@ -579,7 +705,7 @@ ${ps!=='booked'?`
     <span style="font-size:18px">📌</span>
     <div>
       <div style="font-size:14px;font-weight:500;color:var(--purple)">Book private physio</div>
-      <div style="font-size:12px;color:var(--t2);margin-top:4px;line-height:1.5">Your consultant flagged it as one of the highest-leverage things you can do. For a four-part repair — ACL, meniscus root, MCL, chondral — NHS cadence is often too slow to catch loading errors early. Weekly private eyes on the knee is what protects the fixation and speeds the return.</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:4px;line-height:1.5">Your consultant flagged this as one of the highest-leverage things you can do. With a reattached fragment and a reconstructed ACL, the loading has to be right week by week — and NHS cadence is often too slow to catch a compensation pattern before it sets in. This is the phase where it counts.</div>
     </div>
   </div>
   <div style="display:flex;gap:8px">
@@ -597,13 +723,11 @@ ${ps!=='booked'?`
     <button class="tap" onclick="addPhysioSession()" style="padding:0 18px;border-radius:10px;border:none;background:var(--purple);color:#000;font-weight:600;font-family:inherit;cursor:pointer;font-size:13px">Log</button>
   </div>
   <input type="text" id="psNote" placeholder="What they worked on / prescribed…" style="margin-bottom:14px">
-  ${plog.length?plog.slice(0,5).map(s=>`<div style="padding:9px 0;border-top:1px solid var(--line)"><div style="font-size:13px;color:#ddd">${fsh(s.date)}</div>${s.note?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${s.note}</div>`:''}</div>`).join(''):''}
+  ${plog.length?plog.slice(0,6).map(s=>`<div style="padding:9px 0;border-top:1px solid var(--line)"><div style="font-size:13px;color:#ddd">${fsh(s.date)}</div>${s.note?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${s.note}</div>`:''}</div>`).join(''):''}
 </div>`}
 <div class="card">
   <div class="lbl" style="margin-bottom:10px">Physio notes & questions</div>
   <textarea style="min-height:70px" oninput="uPhysioNotes(this.value)" placeholder="Exercises they've prescribed, questions for next session, progress they've noted...">${CFG.physioNotes||''}</textarea>
-</div>
-<div style="height:6px"></div>
 </div>`;
 }
 </script>
@@ -649,19 +773,20 @@ ${LM.map((m)=>{const d=df(m.date),past=d<-1;return`
     ${!past?`<div style="font-size:12px;font-weight:500;color:${d<30?'var(--amber)':'var(--t2)'}">${d<=0?'Today':d<31?'In '+d+' days':d<365?'In '+Math.round(d/30.4)+' months':'In '+(d/365).toFixed(1)+' yrs'}</div>`:'<div style="font-size:12px;color:var(--t3)">Done</div>'}
   </div>
 </div>`}).join('')}
+${physioBlock()}
 <div style="height:6px"></div>
 </div>`;
 }
 
-function render(){if(TAB==='today')renderToday();else if(TAB==='log')renderLog();else if(TAB==='streaks')renderStreaks();else if(TAB==='build')renderBuild();else renderPlan();}
-function sw(t){TAB=t;document.getElementById('scroll').scrollTop=0;const ph=gp(gd());['today','log','streaks','build','plan'].forEach(v=>{const on=v===t;const ic=document.getElementById('ni-'+v),lb=document.getElementById('nl-'+v);if(ic)ic.style.color=on?ph.c:'var(--t3)';if(lb)lb.style.color=on?ph.c:'var(--t3)';});render();}
+function render(){if(TAB==='today')renderToday();else if(TAB==='log')renderLog();else if(TAB==='streaks')renderStreaks();else renderPlan();}
+function sw(t){TAB=t;document.getElementById('scroll').scrollTop=0;const ph=gp(gd());['today','log','streaks','plan'].forEach(v=>{const on=v===t;const ic=document.getElementById('ni-'+v),lb=document.getElementById('nl-'+v);if(ic)ic.style.color=on?ph.c:'var(--t3)';if(lb)lb.style.color=on?ph.c:'var(--t3)';});render();}
 
 load();
 render();
 const ph0=gp(gd());
 document.getElementById('ni-today').style.color=ph0.c;
 document.getElementById('nl-today').style.color=ph0.c;
-['log','streaks','build','plan'].forEach(v=>{document.getElementById('ni-'+v).style.color='var(--t3)';document.getElementById('nl-'+v).style.color='var(--t3)';});
+['log','streaks','plan'].forEach(v=>{document.getElementById('ni-'+v).style.color='var(--t3)';document.getElementById('nl-'+v).style.color='var(--t3)';});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script>
 </body>
